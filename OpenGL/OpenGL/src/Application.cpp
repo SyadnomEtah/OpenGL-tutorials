@@ -5,25 +5,10 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#define ASSERT(x) if(!(x)) __debugbreak()
-#define GLCall(x) GLClearError();\
-	x;\
-	ASSERT(GLLogCall(#x, __FILE__, __LINE__))
+#include "Renderer.h"
+#include "VertexBuffer.h"
+#include "IndexBuffer.h"
 
-static void GLClearError()
-{
-	while (glGetError() != GL_NO_ERROR);
-}
-
-static bool GLLogCall(const char* function, const char* file, int line)
-{
-	while (GLenum error = glGetError())
-	{
-		std::cout << "[OpenGL Error]: (" << error << "): " << function << " " << file << ":" << line << std::endl;
-		return false;
-	}
-	return true;
-}
 
 struct ShaderProgramSource
 {
@@ -64,7 +49,7 @@ static ShaderProgramSource ParseShader(const std::string& filepath)
 
 static unsigned int CompileShader(unsigned int type, const std::string& source)
 {
-	unsigned int id = glCreateShader(type);
+	GLCall(unsigned int id = glCreateShader(type));
 	const char* src = source.c_str();
 	GLCall(glShaderSource(id, 1, &src, nullptr));
 	GLCall(glCompileShader(id));
@@ -93,7 +78,7 @@ static unsigned int CompileShader(unsigned int type, const std::string& source)
 static unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader)
 {
 	//Compile shaders
-	unsigned int program = glCreateProgram();
+	GLCall(unsigned int program = glCreateProgram());
 	unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexShader);
 	unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentShader);
 
@@ -118,6 +103,10 @@ int main(void)
 	if (!glfwInit())
 		return -1;
 
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
 	/* Create a windowed mode window and its OpenGL context */
 	window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
 	if (!window)
@@ -129,64 +118,91 @@ int main(void)
 	/* Make the window's context current */
 	glfwMakeContextCurrent(window);
 
+	glfwSwapInterval(1);
+
 	if (glewInit() != GLEW_OK)
 		std::cout << "ERROR!" << std::endl;
 
-	std::cout << glGetString(GL_VERSION) << std::endl;
+	GLCall(std::cout << glGetString(GL_VERSION) << std::endl);
 
-	//Triangle vertices' positions
-	float positions[] = {
-		-0.5f, -0.5f,
-		 0.5f, -0.5f,
-		 0.5f,  0.5f,
-		-0.5f,  0.5f
-	};
-
-	unsigned int indices[] = {
-		0, 1, 2,
-		2, 3, 0
-	};
-
-	//Create and bind a vertex buffer
-	unsigned int buffer;
-	GLCall(glGenBuffers(1, &buffer));
-	GLCall(glBindBuffer(GL_ARRAY_BUFFER, buffer));
-	GLCall(glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), &positions, GL_STATIC_DRAW));
-
-	//Configure vertex attribute (position)
-	GLCall(glEnableVertexAttribArray(0));
-	GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0));
-
-	//Create and bond an index buffer
-	unsigned int ibo;
-	GLCall(glGenBuffers(1, &ibo));
-	GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
-	GLCall(glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), &indices, GL_STATIC_DRAW));
-
-	//Shaders
-	ShaderProgramSource source = ParseShader("res/shaders/Basic.shader");
-
-	unsigned int shader = CreateShader(source.VertexSource, source.FragmentSource);
-	GLCall(glUseProgram(shader));
-
-	/* Loop until the user closes the window */
-	while (!glfwWindowShouldClose(window))
 	{
-		/* Render here */
-		GLCall(glClear(GL_COLOR_BUFFER_BIT));
+		//Triangle vertices' positions
+		float positions[] = {
+			-0.5f, -0.5f,
+			 0.5f, -0.5f,
+			 0.5f,  0.5f,
+			-0.5f,  0.5f
+		};
 
-		//Draw triangles
-		
-		GLCall(glDrawElements(GL_TRIANGLES, 6, GL_INT, nullptr));
+		unsigned int indices[] = {
+			0, 1, 2,
+			2, 3, 0
+		};
 
-		/* Swap front and back buffers */
-		glfwSwapBuffers(window);
+		unsigned int vao;
+		GLCall(glGenVertexArrays(1, &vao));
+		GLCall(glBindVertexArray(vao));
 
-		/* Poll for and process events */
-		glfwPollEvents();
+		//Create and bind a vertex buffer
+		VertexBuffer vb(positions, 4 * 2 * sizeof(float));
+
+		//Configure vertex attribute (position)
+		GLCall(glEnableVertexAttribArray(0));
+		GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0));
+
+		//Create and bond an index buffer
+		IndexBuffer ib(indices, 6);
+
+		//Shaders
+		ShaderProgramSource source = ParseShader("res/shaders/Basic.shader");
+
+		unsigned int shader = CreateShader(source.VertexSource, source.FragmentSource);
+		GLCall(glUseProgram(shader));
+
+		//Uniforms
+		GLCall(int location = glGetUniformLocation(shader, "u_Color"));
+		ASSERT(location != -1);
+		GLCall(glUniform4f(location, 0.2f, 0.3f, 0.8f, 1.0f));
+
+		GLCall(glBindVertexArray(0));
+		GLCall(glUseProgram(0));
+		GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
+		GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+		float r = 0.0f;
+		float increment = 0.05f;
+
+		/* Loop until the user closes the window */
+		while (!glfwWindowShouldClose(window))
+		{
+			/* Render here */
+			GLCall(glClear(GL_COLOR_BUFFER_BIT));
+
+			//Render
+			GLCall(glUseProgram(shader));
+			GLCall(glUniform4f(location, r, 0.3f, 0.8f, 1.0f));
+
+			GLCall(glBindVertexArray(vao));
+			ib.Bind();
+
+			GLCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
+
+			if (r > 1.0f)
+				increment = -0.05f;
+			else if (r < 0.0f)
+				increment = 0.05f;
+
+			r += increment;
+
+			/* Swap front and back buffers */
+			glfwSwapBuffers(window);
+
+			/* Poll for and process events */
+			glfwPollEvents();
+		}
+
+		GLCall(glDeleteProgram(shader));
 	}
-
-	GLCall(glDeleteProgram(shader));
 
 	glfwTerminate();
 	return 0;
