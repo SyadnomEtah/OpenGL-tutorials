@@ -1,4 +1,5 @@
 #include "Shader.h"
+#include "Renderer.h"
 
 Shader::Shader(const std::string& filePath)
 	:m_FilePath(filePath), m_RendererID(0)
