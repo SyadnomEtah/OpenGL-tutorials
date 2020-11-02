@@ -51,10 +51,10 @@ int main(void)
 	{
 		//Triangle vertices' positions
 		float positions[] = {
-			100.0f, 100.0f, 0.0f, 0.0f,
-			200.0f, 100.0f, 1.0f, 0.0f,
-			200.0f, 200.0f, 1.0f, 1.0f,
-			100.0f, 200.0f, 0.0f, 1.0f
+			-50.0f, -50.0f, 0.0f, 0.0f,
+			 50.0f, -50.0f, 1.0f, 0.0f,
+			 50.0f,  50.0f, 1.0f, 1.0f,
+			-50.0f,  50.0f, 0.0f, 1.0f
 		};
 
 		unsigned int indices[] = {
@@ -76,7 +76,7 @@ int main(void)
 		IndexBuffer ib(indices, 6);
 
 		glm::mat4 proj = glm::ortho(0.0f, float(windowWidth), 0.0f, float(windowHeight), -1.0f, 1.0f);
-		glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(-100.0f, 0.0f, 0.0f));
+		glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
 
 		Shader shader("res/shaders/Basic.shader");
 		shader.Bind();
@@ -98,10 +98,8 @@ int main(void)
 		ImGui_ImplOpenGL3_Init((char*)glGetString(GL_NUM_SHADING_LANGUAGE_VERSIONS));
 		ImGui::StyleColorsDark();
 
-		glm::vec3 translation(200.0f, 200.0f, 0.0f);
-
-		float r = 0.0f;
-		float increment = 0.05f;
+		glm::vec3 translationA(200.0f, 200.0f, 0.0f);
+		glm::vec3 translationB(400.0f, 200.0f, 0.0f);
 
 		while (!glfwWindowShouldClose(window))
 		{
@@ -111,28 +109,27 @@ int main(void)
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-			glm::mat4 model = glm::translate(glm::mat4(1.0f), translation);
+			glm::mat4 model = glm::translate(glm::mat4(1.0f), translationA);
 			glm::mat4 mvp = proj * view * model;
 
 			shader.Bind();
-			shader.SetUniform4f("u_Color", r, 0.3f, 0.8f, 1.0f);
-			shader.SetUniformMat4f("u_MVP", mvp);
 
+			shader.SetUniformMat4f("u_MVP", mvp);
 			renderer.Draw(va, ib, shader);
 
-			if (r > 1.0f)
-				increment = -0.05f;
-			else if (r < 0.0f)
-				increment = 0.05f;
+			model = glm::translate(glm::mat4(1.0f), translationB);
+			mvp = proj * view * model;
 
-			r += increment;
+			shader.SetUniformMat4f("u_MVP", mvp);
+			renderer.Draw(va, ib, shader);
 
 			{
-				ImGui::SliderFloat3("Translation", &translation.x, 0.0f, windowWidth);
+				ImGui::SliderFloat3("Translation A", &translationA.x, 0.0f, windowWidth);
+				ImGui::SliderFloat3("Translation B", &translationB.x, 0.0f, windowWidth);
 
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 			}
-
+			
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
